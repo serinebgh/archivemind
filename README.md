@@ -1,170 +1,205 @@
 # ArchiveMind
 
-Moteur de recherche local dans vos PDF. 100% offline, aucune donnée envoyée.
+> Moteur de recherche RAG local dans vos PDF — 100% offline, zéro fuite de données.
 
-## Ce que ça fait
-
-- Tu déposes 1 ou 10 000 PDF dans un dossier
-- ArchiveMind les indexe une fois
-- Tu poses des questions en français naturel
-- Il te répond **uniquement à partir de tes PDF**, avec le nom du fichier et la page exacte
-- Tu cliques sur la source → ça ouvre le PDF à la bonne page
+Pose une question en langage naturel. ArchiveMind lit tes PDF, trouve les passages pertinents et te répond avec le nom du fichier et la page exacte. Rien ne quitte ta machine.
 
 ---
 
-## Installation (15 minutes)
+## C'est quoi ?
 
-### Étape 1 — Python
+ArchiveMind est un système **RAG** — Retrieval-Augmented Generation.
 
-Si Python n'est pas installé : https://python.org/downloads  
-Version minimum : **3.10**
+RAG = un LLM (modèle de langage) couplé à un moteur de recherche dans tes propres documents. Au lieu de répondre depuis sa mémoire d'entraînement, il **récupère d'abord les passages pertinents** dans tes PDF, puis génère une réponse à partir de ces passages uniquement.
 
-### Étape 2 — Ollama (moteur IA local)
+Résultat : les réponses sont ancrées dans tes documents, citées et vérifiables — pas inventées.
 
-1. Télécharge Ollama sur https://ollama.com
-2. Installe-le
-3. Dans un terminal, lance :
+## Fonctionnement
 
 ```
+Ta question
+    ↓
+ChromaDB — recherche vectorielle dans tes PDF indexés  (Retrieval)
+    ↓
+Ollama (LLM local) — génère une réponse à partir des passages trouvés  (Generation)
+    ↓
+Réponse + sources cliquables (fichier + page)
+```
+
+Le LLM est bridé à tes documents — il ne peut pas inventer ni aller chercher ailleurs.
+
+---
+
+## Prérequis
+
+| Outil | Version minimum | Lien |
+|-------|----------------|------|
+| Python | 3.10 | [python.org](https://python.org/downloads) |
+| Ollama | dernière | [ollama.com](https://ollama.com) |
+| RAM libre | 4 Go minimum | — |
+| Espace disque | ~5 Go pour les modèles | — |
+
+---
+
+## Installation
+
+### 1. Ollama
+
+Télécharge et installe Ollama depuis [ollama.com](https://ollama.com).
+
+> **Windows avec C: plein** : définis la variable d'environnement avant d'installer pour rediriger les modèles vers un autre disque :
+> ```powershell
+> [System.Environment]::SetEnvironmentVariable("OLLAMA_MODELS", "D:\ollama\models", "Machine")
+> ```
+
+Lance Ollama (garde ce terminal ouvert) :
+```bash
 ollama serve
 ```
 
-4. Dans un autre terminal, télécharge les modèles :
-
-```
+Dans un second terminal, télécharge les modèles :
+```bash
 ollama pull mistral
 ollama pull nomic-embed-text
 ```
 
-> `mistral` = le cerveau qui répond à tes questions (~4 Go)  
-> `nomic-embed-text` = transforme le texte en vecteurs (~300 Mo)
+**Choix du modèle selon ta RAM :**
 
-**Alternatives selon ta RAM :**
-| RAM disponible | Modèle recommandé |
-|---------------|-------------------|
-| 4 Go          | `phi3:mini`       |
-| 8 Go          | `mistral` ✓       |
-| 16+ Go        | `mistral-nemo`    |
+| RAM disponible | Modèle | Vitesse |
+|---------------|--------|---------|
+| 4 Go | `phi3:mini` | Rapide |
+| 8 Go | `mistral` ✓ | Bon équilibre |
+| 16+ Go | `mistral-nemo` | Meilleure qualité |
 
-### Étape 3 — Dépendances Python
+### 2. Dépendances Python
 
-Dans le dossier `archivemind/`, lance :
-
-```
+```bash
+cd archivemind
 python setup.py
+pip install ollama
 ```
 
-### Étape 4 — Configuration
+### 3. Configuration
 
-Ouvre `config.py` et mets le chemin de ton dossier PDF :
+Ouvre `config.py` et renseigne le chemin de ton dossier PDF :
 
 ```python
 PDF_FOLDER = r"C:\Users\TonNom\Documents\Archives"
 ```
 
-Change aussi le modèle si tu en as choisi un autre :
+Le dossier peut contenir des sous-dossiers — tous les PDF sont trouvés automatiquement.
+
+Autres réglages disponibles :
 
 ```python
-OLLAMA_MODEL = "mistral"   # ou "phi3:mini" etc.
+OLLAMA_MODEL = "mistral"              # modèle LLM
+EMBEDDING_MODEL = "nomic-embed-text"  # modèle d'indexation
+TOP_K_RESULTS = 5                     # passages récupérés par requête (↓ = plus rapide)
+CHUNK_SIZE = 800                      # taille des chunks en caractères
 ```
 
-### Étape 5 — Indexation
+### 4. Indexation
 
-Lance l'indexation (une seule fois, ou quand tu ajoutes des PDF) :
-
-```
+```bash
 python ingest.py
 ```
 
-Pour les gros volumes (milliers de PDF), ça peut prendre du temps. L'avancement s'affiche en temps réel. Les PDF déjà indexés sont ignorés lors des prochains lancements.
+L'indexation est incrémentale — les PDF déjà indexés sont ignorés au prochain lancement. Pour tout réindexer depuis zéro :
 
-### Étape 6 — Lancer l'interface
-
+```bash
+python ingest.py --reset
 ```
+
+### 5. Lancement
+
+```bash
 python app.py
 ```
 
-Puis ouvre http://localhost:5000 dans ton navigateur.
+Ouvre ensuite **http://localhost:5000** dans ton navigateur.
 
-**Ou** double-clique sur `start.bat` (Windows).
+**Windows** : double-clique sur `start.bat` pour tout lancer en un clic.
+
+> ⚠️ Ollama doit toujours tourner en arrière-plan (`ollama serve`) pendant l'utilisation.
 
 ---
 
 ## Utilisation
 
-1. Pose ta question dans le chat
-2. ArchiveMind cherche dans tous tes PDF
-3. Il répond avec les passages pertinents
-4. Les sources apparaissent en vert avec le nom du fichier et la page
-5. Clique sur une source → le PDF s'ouvre à la bonne page
+1. Pose ta question dans le chat en langage naturel
+2. ArchiveMind cherche dans tous tes PDF indexés
+3. La réponse s'affiche avec les sources en vert (fichier + page)
+4. Clique sur une source → le PDF s'ouvre directement à la bonne page
 
-**Ajouter des PDF**
-1. Copie les nouveaux PDF dans ton dossier configuré
+**Ajouter de nouveaux PDF**
+
+1. Copie les PDF dans le dossier configuré
 2. Relance `python ingest.py`
 3. Relance `python app.py`
 
-**Réindexer tout depuis zéro**
-```
-python ingest.py --reset
+---
+
+## Optimisation des performances
+
+**Réponses lentes ?**
+
+- Passe à `phi3:mini` dans `config.py` — 3x plus rapide que mistral sur CPU
+- Réduis `TOP_K_RESULTS = 3` pour analyser moins de passages
+- Si tu as une carte graphique Nvidia, Ollama l'utilise automatiquement (x10-x20 plus rapide)
+
+**Vérifier si le GPU est utilisé :**
+```bash
+ollama ps
 ```
 
 ---
 
-## Architecture
+## Structure du projet
 
 ```
-Tes PDF (disque local)
-       ↓
-   ingest.py
-   PyMuPDF → extrait le texte page par page
-   Découpe en chunks (800 caractères)
-   Ollama nomic-embed-text → vecteurs
-       ↓
-   ChromaDB (dossier chroma_db/ local)
-       ↓
-   app.py (Flask local)
-   → Reçoit ta question
-   → La convertit en vecteur
-   → Cherche les passages les plus proches
-   → Envoie au LLM Ollama avec les passages
-   → Stream la réponse
-       ↓
-   Interface web (localhost:5000)
+archivemind/
+├── config.py          ← Configuration (chemin PDF, modèle, réglages)
+├── ingest.py          ← Indexation des PDF dans ChromaDB
+├── app.py             ← Serveur Flask local + API chat
+├── setup.py           ← Installation automatique des dépendances
+├── start.bat          ← Lancement en un clic (Windows)
+├── start.sh           ← Lancement en un clic (Mac/Linux)
+├── templates/
+│   └── index.html     ← Interface chat
+└── chroma_db/         ← Base vectorielle locale (générée automatiquement)
 ```
-
-**Aucune connexion internet requise après installation.**  
-**Aucune donnée ne quitte ta machine.**
 
 ---
 
 ## Dépannage
 
-**"Ollama non détecté"**  
-→ Lance `ollama serve` dans un terminal séparé
+**`ollama` non reconnu dans le terminal**
+→ Ferme et rouvre le terminal après installation. Sur Windows : `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`
 
-**"Aucun document indexé"**  
+**"Aucun document indexé"**
 → Vérifie le chemin dans `config.py` et relance `python ingest.py`
 
-**Réponses lentes**  
-→ Normal sur CPU — le premier message prend 10-30 secondes  
-→ Passe à `phi3:mini` si ta machine est limitée
+**Timeout pendant l'indexation**
+→ Normal sur les gros PDF — relance simplement `python ingest.py`, les fichiers déjà indexés sont ignorés
 
-**Erreur de mémoire**  
-→ Change pour un modèle plus petit dans `config.py`
+**Erreur "Espace insuffisant"**
+→ Définis `OLLAMA_MODELS` vers un disque avec plus d'espace (voir section installation)
+
+**Réponse hors sujet**
+→ Le LLM répond uniquement à partir des passages récupérés — reformule ta question avec des mots clés plus précis
 
 ---
 
-## Structure des fichiers
+## Confidentialité
 
-```
-archivemind/
-├── config.py          ← Configuration (chemin PDF, modèle)
-├── ingest.py          ← Indexation des PDF
-├── app.py             ← Serveur local
-├── setup.py           ← Installation des dépendances
-├── start.bat          ← Lancement Windows
-├── start.sh           ← Lancement Mac/Linux
-├── templates/
-│   └── index.html     ← Interface chat
-└── chroma_db/         ← Base vectorielle (créée automatiquement)
-```
+- Aucune connexion internet requise après installation
+- Aucune donnée ne quitte ta machine
+- Les PDF restent sur ton disque
+- La base vectorielle (`chroma_db/`) est un dossier local standard
+- Le modèle LLM tourne entièrement en local via Ollama
+
+---
+
+## Licence
+
+MIT
